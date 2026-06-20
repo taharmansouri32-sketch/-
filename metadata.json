@@ -1,0 +1,6 @@
+{
+  "name": "بوابة الترشح للماستر - Master Application Portal",
+  "description": "منصة رقمية لترشح الطلبة للتكوين في الماستر واختيار الرغبات ومتابعة الملفات",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
