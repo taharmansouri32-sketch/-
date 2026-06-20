@@ -38,30 +38,71 @@ export default function App() {
 
   // Storage for applications
   const [applications, setApplications] = useState<CandidateApplication[]>([]);
+  const applicationsRef = React.useRef<CandidateApplication[]>([]);
   
   // Selected application to render printed version of receipt
   const [selectedReceiptApp, setSelectedReceiptApp] = useState<CandidateApplication | null>(null);
 
-  // Load applications from localStorage on boot, or fallback to the rich initial seed
-  useEffect(() => {
-    const stored = localStorage.getItem("master_applications");
-    if (stored) {
-      try {
-        let parsed = JSON.parse(stored) as CandidateApplication[];
-        // Filter out old trial candidates from cached registers
-        const mockIds = ["M2026-8041", "M2026-1049", "M2026-3022", "M2026-9099", "L2026-4401", "L2026-5110", "L2026-8877", "L2026-9024"];
-        parsed = parsed.filter(app => !mockIds.includes(app.id));
-        setApplications(parsed);
-        localStorage.setItem("master_applications", JSON.stringify(parsed));
-      } catch (err) {
-        console.error("Failed to parse stored applications, resetting...", err);
-        setApplications([]);
-        localStorage.setItem("master_applications", JSON.stringify([]));
+  const syncWithDatabase = async () => {
+    try {
+      const resSettings = await fetch("/api/settings");
+      if (resSettings.ok) {
+        const serverSettings = await resSettings.json();
+        
+        let changed = false;
+        const setLocalIfDiff = (key: string, val: string) => {
+          const current = localStorage.getItem(key);
+          if (current !== val) {
+            localStorage.setItem(key, val);
+            changed = true;
+          }
+        };
+
+        setLocalIfDiff("reg_start_date_master_80", serverSettings.master_80.startDate);
+        setLocalIfDiff("reg_end_date_master_80", serverSettings.master_80.endDate);
+        setLocalIfDiff("reg_period_enabled_master_80", String(serverSettings.master_80.isEnabled));
+
+        // Legacy/master suffix for safety
+        setLocalIfDiff("reg_start_date_master", serverSettings.master_80.startDate);
+        setLocalIfDiff("reg_end_date_master", serverSettings.master_80.endDate);
+        setLocalIfDiff("reg_period_enabled_master", String(serverSettings.master_80.isEnabled));
+
+        setLocalIfDiff("reg_start_date_master_20", serverSettings.master_20.startDate);
+        setLocalIfDiff("reg_end_date_master_20", serverSettings.master_20.endDate);
+        setLocalIfDiff("reg_period_enabled_master_20", String(serverSettings.master_20.isEnabled));
+
+        setLocalIfDiff("reg_start_date_l3", serverSettings.l3.startDate);
+        setLocalIfDiff("reg_end_date_l3", serverSettings.l3.endDate);
+        setLocalIfDiff("reg_period_enabled_l3", String(serverSettings.l3.isEnabled));
+
+        if (changed) {
+          window.dispatchEvent(new Event("reg-period-updated"));
+        }
       }
-    } else {
-      setApplications([]);
-      localStorage.setItem("master_applications", JSON.stringify([]));
+    } catch (e) {
+      console.error("Failed to sync settings with server", e);
     }
+
+    try {
+      const resApps = await fetch("/api/applications");
+      if (resApps.ok) {
+        const serverApps = await resApps.json();
+        if (JSON.stringify(serverApps) !== JSON.stringify(applicationsRef.current)) {
+          applicationsRef.current = serverApps;
+          setApplications(serverApps);
+          localStorage.setItem("master_applications", JSON.stringify(serverApps));
+        }
+      }
+    } catch (e) {
+      console.error("Failed to sync apps with server", e);
+    }
+  };
+
+  // Sync in background of the main App
+  useEffect(() => {
+    syncWithDatabase();
+    const interval = setInterval(syncWithDatabase, 3500);
+    return () => clearInterval(interval);
   }, []);
 
   // Global event listener to open pedagogical compatibility guide
@@ -75,12 +116,6 @@ export default function App() {
     };
   }, []);
 
-  // Sync state variations with localStorage
-  const saveApplications = (newApps: CandidateApplication[]) => {
-    setApplications(newApps);
-    localStorage.setItem("master_applications", JSON.stringify(newApps));
-  };
-
   // Safe handler to set admin status on/off
   const handleSetIsSiteAdmin = (val: boolean) => {
     setIsSiteAdmin(val);
@@ -90,32 +125,64 @@ export default function App() {
   };
 
   // Action: Add new application
-  const handleNewApplication = (newApp: CandidateApplication) => {
-    const updated = [newApp, ...applications];
-    saveApplications(updated);
-    
-    // Direct applicant toward their printable receipt immediately!
-    setSelectedReceiptApp(newApp);
-    setCurrentView("receipt");
+  const handleNewApplication = async (newApp: CandidateApplication) => {
+    try {
+      const res = await fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newApp)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setSelectedReceiptApp(newApp);
+          setCurrentView("receipt");
+          syncWithDatabase();
+        }
+      }
+    } catch (e) {
+      console.error("Failed to submit candidacy to server", e);
+    }
   };
 
-  // Action: Update candidate pedagogical status
-  const handleUpdateStatus = (id: string, updates: Partial<CandidateApplication>) => {
-    const updated = applications.map(app => 
-      app.id === id ? { ...app, ...updates } : app
-    );
-    saveApplications(updated);
+  // Action: Update candidate status
+  const handleUpdateStatus = async (id: string, updates: Partial<CandidateApplication>) => {
+    try {
+      const res = await fetch(`/api/applications/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        syncWithDatabase();
+      }
+    } catch (e) {
+      console.error("Failed to update registration status", e);
+    }
   };
 
   // Action: Reset Database to empty state
-  const handleResetApplications = () => {
-    saveApplications([]);
+  const handleResetApplications = async () => {
+    try {
+      const res = await fetch("/api/applications", { method: "DELETE" });
+      if (res.ok) {
+        syncWithDatabase();
+      }
+    } catch (e) {
+      console.error("Failed to reset candidates database", e);
+    }
   };
 
   // Action: Delete student from Roster
-  const handleDeleteApplication = (id: string) => {
-    const updated = applications.filter(app => app.id !== id);
-    saveApplications(updated);
+  const handleDeleteApplication = async (id: string) => {
+    try {
+      const res = await fetch(`/api/applications/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        syncWithDatabase();
+      }
+    } catch (e) {
+      console.error("Failed to delete candidate registration", e);
+    }
   };
 
   // Safe navigation back to status lookup
@@ -212,6 +279,7 @@ export default function App() {
                 onNavigateToTracking={handleNavToTracking}
                 lang={lang}
                 isSiteAdmin={isSiteAdmin}
+                applications={applications}
               />
             )}
 

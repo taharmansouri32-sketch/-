@@ -137,6 +137,17 @@ export default function AdminPortal({
     setRegistrationPeriod("master", regMaster80StartDate, regMaster80EndDate, regMaster80Enabled);
     
     setRegistrationPeriod("l3_specialty", regL3StartDate, regL3EndDate, regL3Enabled);
+
+    // Save registration status to centralization server
+    fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        master_80: { startDate: regMaster80StartDate, endDate: regMaster80EndDate, isEnabled: regMaster80Enabled },
+        master_20: { startDate: regMaster20StartDate, endDate: regMaster20EndDate, isEnabled: regMaster20Enabled },
+        l3: { startDate: regL3StartDate, endDate: regL3EndDate, isEnabled: regL3Enabled }
+      })
+    }).catch(err => console.error("Failed to sync system configuration to server", err));
     
     // Dispatch custom event to notify external listeners (like ApplicationForm and Header) about saved dates
     if (typeof window !== "undefined") {

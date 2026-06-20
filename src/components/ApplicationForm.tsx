@@ -31,13 +31,15 @@ interface ApplicationFormProps {
   onNavigateToTracking: (idToSearch?: string) => void;
   lang: LangType;
   isSiteAdmin?: boolean;
+  applications?: CandidateApplication[];
 }
 
 export default function ApplicationForm({ 
   onApplicationSubmit, 
   onNavigateToTracking,
   lang,
-  isSiteAdmin = false
+  isSiteAdmin = false,
+  applications = []
 }: ApplicationFormProps) {
   const t = translations[lang];
 
@@ -177,6 +179,9 @@ export default function ApplicationForm({
 
   // Form states - Declaration
   const [declarationAccepted, setDeclarationAccepted] = useState(false);
+
+  // Ready to submit application after double-checking confirmation alert has been shown
+  const [reviewSubmissionApp, setReviewSubmissionApp] = useState<CandidateApplication | null>(null);
 
   // List of fields that are missing/incorrect in the current stage to display a beautiful custom alert
   const [validationAlertFields, setValidationAlertFields] = useState<string[] | null>(null);
@@ -400,6 +405,29 @@ export default function ApplicationForm({
       if (applicationType === "master" && university === "أخرى" && !customUniversity.trim()) {
         newErrors.customUniversity = lang === "ar" ? "الرجاء إدخال اسم الجامعة أو المركز الجامعي الذي تخرجت منه" : lang === "fr" ? "Veuillez spécifier l'université d'origine" : "Please enter your university of graduation";
       }
+
+      // Check for duplicate candidate dossier registration
+      if (!newErrors.nationalStudentId && nationalStudentId.trim()) {
+        const isDuplicateBac = applications.some(app => app.nationalStudentId.trim().toLowerCase() === nationalStudentId.trim().toLowerCase());
+        if (isDuplicateBac) {
+          newErrors.nationalStudentId = lang === "ar" 
+            ? "عذراً، رقم التسجيل الوطني (BAC) هذا مسجل مسبقاً في قاعدة البيانات! لا يمكن تقديم أكثر من طلب واحد لنفس الطالب." 
+            : lang === "fr" 
+            ? "Ce numéro national (BAC) est déjà enregistré ! Il n'est pas possible de soumettre plusieurs dossiers." 
+            : "This national student registration number (BAC) is already registered! Multiple dossiers are not allowed.";
+        }
+      }
+
+      if (!newErrors.email && email.trim()) {
+        const isDuplicateEmail = applications.some(app => app.email.trim().toLowerCase() === email.trim().toLowerCase());
+        if (isDuplicateEmail) {
+          newErrors.email = lang === "ar" 
+            ? "البريد الإلكتروني هذا مستخدم بالفعل في طلب تسجيل موجود لدينا." 
+            : lang === "fr" 
+            ? "Cette adresse e-mail est déjà utilisée pour un autre dossier d'inscription." 
+            : "This email address is already in use for another candidate dossier.";
+        }
+      }
     }
 
     if (currentStep === 2) {
@@ -505,7 +533,7 @@ export default function ApplicationForm({
       )
     };
 
-    onApplicationSubmit(newApplication);
+    setReviewSubmissionApp(newApplication);
   };
 
   // Evaluate candidate's program selection compatibility
@@ -2463,6 +2491,129 @@ export default function ApplicationForm({
                 className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-black cursor-pointer shadow-sm hover:shadow-md transition-all duration-150 w-full sm:w-auto"
               >
                 {lang === "ar" ? "حسنًا، سأكملها الآن" : lang === "fr" ? "D'accord, je complète" : "Okay, Let's Complete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Validation Review & Warning Confirmation Modal */}
+      {reviewSubmissionApp && (
+        <div 
+          className="fixed inset-0 bg-slate-900/65 z-[9999] flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in text-start"
+          onClick={() => setReviewSubmissionApp(null)}
+          dir={lang === "ar" ? "rtl" : "ltr"}
+        >
+          <div 
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden transform scale-100 transition-all duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-5 flex items-center gap-3 bg-amber-50 border-b border-amber-200 text-amber-800">
+              <div className="p-2.5 bg-amber-100/80 rounded-lg shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="grow">
+                <h4 className="font-extrabold text-sm text-amber-900 leading-tight">
+                  {lang === "ar" ? "⚠️ مراجعة هامة: تأكيد صحة البيانات" : lang === "fr" ? "⚠️ Vérification obligatoire de vos informations" : "⚠️ Critical Review: Confirm Registration Data"}
+                </h4>
+                <p className="text-[10px] text-amber-700 font-extrabold mt-0.5 leading-tight">
+                  {lang === "ar" ? "يرجى التحقق جيداً من كافة مدخلاتك قبل إرسال ملفك نهائياً" : lang === "fr" ? "Veuillez valider l'authenticité de vos coordonnées avant soumission" : "Please double check your entries fully before final submission"}
+                </p>
+              </div>
+            </div>
+
+            {/* Content summary */}
+            <div className="p-6 space-y-4 max-h-[380px] overflow-y-auto">
+              {/* Alert prompt as requested */}
+              <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-[11px] leading-relaxed text-rose-800 font-bold">
+                {lang === "ar" 
+                  ? "تنبيه هام جداً: تأكد من صحة الاسم، رقم التسجيل الوطني (BAC)، معدل الليسانس الإجمالي، وحزمة الرغبات. أي خطأ في هذه البيانات قد يعرض ترشحك للإلغاء التلقائي ولا يسمح بتعديله بعد الإرسال."
+                  : lang === "fr"
+                  ? "Attention particulière : L'exactitude du nom, ID national (BAC), moyenne de Licence et ordre des choix est obligatoire. Toute erreur entraînera une disqualification systématique."
+                  : "Attention: Ensure your name, student ID, graduation GPA, and priority choices are perfectly accurate. Inaccurate data will cause instant system rejection without subsequent revision."}
+              </div>
+
+              {/* Data Summary */}
+              <div className="bg-slate-50 border border-slate-150 rounded-xl p-4 space-y-3 text-xs font-semibold">
+                <div className="grid grid-cols-2 gap-2.5 pb-2.5 border-b border-slate-200">
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-bold mb-0.5">{lang === "ar" ? "الاسم الكامل (عربي)" : "Nom & Prénom (Arabe)"}</span>
+                    <span className="font-extrabold text-slate-800">{reviewSubmissionApp.firstNameAr} {reviewSubmissionApp.lastNameAr}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-bold mb-0.5">{lang === "ar" ? "الاسم الكامل (لاتيني)" : "Nom & Prénom (Latin)"}</span>
+                    <span className="font-extrabold text-slate-800">{reviewSubmissionApp.firstNameEn} {reviewSubmissionApp.lastNameEn}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 pb-2.5 border-b border-slate-200">
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-bold mb-0.5">{lang === "ar" ? "رقم تسجيل بكالوريا (BAC)" : "Numéro BAC"}</span>
+                    <span className="font-mono font-extrabold text-slate-800">{reviewSubmissionApp.nationalStudentId}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-bold mb-0.5">{lang === "ar" ? "معدل التخرج" : "Moyenne Diplôme"}</span>
+                    <span className="font-mono font-extrabold text-emerald-700">{reviewSubmissionApp.licenceGpa} / 20.00</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 pb-2.5 border-b border-slate-200">
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-bold mb-0.5">{lang === "ar" ? "البريد الإلكتروني" : "E-mail"}</span>
+                    <span className="font-bold text-slate-700 break-all">{reviewSubmissionApp.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-bold mb-0.5">{lang === "ar" ? "رقم الهاتف" : "Téléphone"}</span>
+                    <span className="font-mono font-bold text-slate-755">{reviewSubmissionApp.phone}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-slate-400 text-[10px] block font-bold mb-1">{lang === "ar" ? "ترتيب رغباتك المختارة:" : "Ordre de vos préférences :"}</span>
+                  <div className="space-y-1 bg-white/75 p-2.5 border border-slate-200 rounded-lg">
+                    {reviewSubmissionApp.choices.filter(Boolean).map((choiceId, index) => {
+                      let programName = choiceId;
+                      if (applicationType === "l3_specialty") {
+                        const targetSpec = L3_SPECIALTIES.find(p => p.id === choiceId);
+                        if (targetSpec) programName = lang === "ar" ? targetSpec.nameAr : targetSpec.nameEn;
+                      } else {
+                        const targetProg = MASTER_PROGRAMS.find(p => p.id === choiceId);
+                        if (targetProg) programName = lang === "ar" ? targetProg.nameAr : targetProg.nameEn;
+                      }
+
+                      return (
+                        <div key={index} className="flex items-center gap-2 text-[11px] font-bold">
+                          <span className="w-5 h-5 rounded-md bg-[#132c6e] hover:bg-[#0c1c49] text-white flex items-center justify-center shrink-0 font-mono text-[10px]">{index + 1}</span>
+                          <span className="text-slate-800">{programName}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 p-4 border-t border-slate-150 flex flex-col sm:flex-row gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setReviewSubmissionApp(null)}
+                className="px-4 py-2 border border-slate-300 rounded-xl bg-white hover:bg-slate-100 text-slate-750 text-xs font-bold transition cursor-pointer"
+              >
+                {lang === "ar" ? "تعديل وتصحيح" : lang === "fr" ? "Modifier/Corriger" : "Edit & Modify"}
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  onApplicationSubmit(reviewSubmissionApp);
+                  setReviewSubmissionApp(null);
+                }}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-black cursor-pointer shadow-sm transition flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>{lang === "ar" ? "نعم، أدخلت البيانات صحيحة - إرسال" : lang === "fr" ? "Oui, informations exactes - Soumettre" : "Yes, register my candidacy dossier"}</span>
               </button>
             </div>
           </div>
