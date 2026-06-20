@@ -178,6 +178,91 @@ export default function ApplicationForm({
   // Form states - Declaration
   const [declarationAccepted, setDeclarationAccepted] = useState(false);
 
+  // List of fields that are missing/incorrect in the current stage to display a beautiful custom alert
+  const [validationAlertFields, setValidationAlertFields] = useState<string[] | null>(null);
+
+  const getFieldLabel = (key: string): string => {
+    if (lang === "ar") {
+      switch (key) {
+        case "firstNameAr": return "الاسم بالعربية";
+        case "lastNameAr": return "اللقب بالعربية";
+        case "firstNameEn": return "الاسم باللاتينية";
+        case "lastNameEn": return "اللقب باللاتينية";
+        case "email": return "البريد الإلكتروني";
+        case "phone": return "رقم الهاتف";
+        case "nationalStudentId": return "رقم التسجيل الوطني (BAC)";
+        case "customLicenceSpecialty": return "تخصُّص الليسانس بالتفصيل";
+        case "licenceGpa": return "معدل الليسانس الإجمالي";
+        case "l1Gpa": return "كشف نقاط مستقل - السنة الأولى L1";
+        case "l2Gpa": return "كشف نقاط مستقل - السنة الثانية L2";
+        case "customUniversity": return "جامعة التخرج الأخرى";
+        case "choice1": return "الرغبة الأولى";
+        case "choice2": return "الرغبة الثانية";
+        case "choice3": return "الرغبة الثالثة";
+        case "choice4": return "الرغبة الرابعة";
+        case "choicesCount": return "تحديد كافة الاختيارات المطلوبة";
+        case "choicesUnique": return "عدم تكرار التخصصات في الرغبات";
+        case "docTranscript": return "رفع ملف كشف النقاط الإجمالي";
+        case "docDiploma": return "رفع وثيقة شهادة تخرج الليسانس";
+        case "docId": return "رفع وثيقة بطاقة الهوية";
+        case "declaration": return "الموافقة على التصريح الشرفي قبل تقديم الطلب";
+        default: return key;
+      }
+    } else if (lang === "fr") {
+      switch (key) {
+        case "firstNameAr": return "Prénom en arabe";
+        case "lastNameAr": return "Nom en arabe";
+        case "firstNameEn": return "Prénom en latin";
+        case "lastNameEn": return "Nom en latin";
+        case "email": return "Adresse e-mail";
+        case "phone": return "Numéro de téléphone";
+        case "nationalStudentId": return "ID étudiant national (BAC)";
+        case "customLicenceSpecialty": return "Spécialité de Licence personnalisée";
+        case "licenceGpa": return "Moyenne générale de Licence";
+        case "l1Gpa": return "Moyenne L1";
+        case "l2Gpa": return "Moyenne L2";
+        case "customUniversity": return "Autre université d'origine";
+        case "choice1": return "1er vœu de spécialité";
+        case "choice2": return "2ème vœu de spécialité";
+        case "choice3": return "3ème vœu de spécialité";
+        case "choice4": return "4ème vœu de spécialité";
+        case "choicesCount": return "Nombre de vœux requis";
+        case "choicesUnique": return "Pas de vœux en doublon";
+        case "docTranscript": return "Fichier Relevé de Notes";
+        case "docDiploma": return "Fichier Diplôme de Licence";
+        case "docId": return "Fichier Carte d'Identité";
+        case "declaration": return "Déclaration sur l'honneur obligatoire";
+        default: return key;
+      }
+    } else {
+      switch (key) {
+        case "firstNameAr": return "First Name (Arabic)";
+        case "lastNameAr": return "Last Name (Arabic)";
+        case "firstNameEn": return "First Name (Latin)";
+        case "lastNameEn": return "Last Name (Latin)";
+        case "email": return "Email Address";
+        case "phone": return "Phone Number";
+        case "nationalStudentId": return "National Student ID (BAC)";
+        case "customLicenceSpecialty": return "Custom Licence Specialty";
+        case "licenceGpa": return "Licence Graduation GPA";
+        case "l1Gpa": return "Year 1 GPA";
+        case "l2Gpa": return "Year 2 GPA";
+        case "customUniversity": return "Other University";
+        case "choice1": return "First Choice";
+        case "choice2": return "Second Choice";
+        case "choice3": return "Third Choice";
+        case "choice4": return "Fourth Choice";
+        case "choicesCount": return "Total choices count requirement";
+        case "choicesUnique": return "Choice uniqueness check";
+        case "docTranscript": return "Transcript Document Upload";
+        case "docDiploma": return "Diploma/Licence Certificate Upload";
+        case "docId": return "Identity Card Upload";
+        case "declaration": return "Honor Declaration Agreement";
+        default: return key;
+      }
+    }
+  };
+
   // Helpers to get all programs that are NOT selected in previous choices to prevent duplicate slots, filtered by compatibility
   const getAvailableOptions = (currentActiveValue: string, ...otherSelected: string[]) => {
     if (applicationType === "l3_specialty") {
@@ -353,7 +438,15 @@ export default function ApplicationForm({
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    
+    const hasErrors = Object.keys(newErrors).length > 0;
+    if (hasErrors) {
+      setValidationAlertFields(Object.keys(newErrors));
+    } else {
+      setValidationAlertFields(null);
+    }
+
+    return !hasErrors;
   };
 
   // Submission handler
@@ -364,6 +457,7 @@ export default function ApplicationForm({
         ...prev, 
         declaration: lang === "ar" ? "يجب تأكيد وقبول التصريح الشرفي قبل تقديم الملف البيداغوجي" : lang === "fr" ? "Vous devez accepter la déclaration d'honneur avant de soumettre." : "You must accept the honor declaration before submission." 
       }));
+      setValidationAlertFields(["declaration"]);
       return;
     }
 
@@ -2301,6 +2395,74 @@ export default function ApplicationForm({
                 }`}
               >
                 {lang === "ar" ? "موافق، تم الاستيعاب" : lang === "fr" ? "D'accord, compris" : "Understood, Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Validation Alert Modal to prevent proceeding/submitting with empty mandatory fields */}
+      {validationAlertFields && validationAlertFields.length > 0 && (
+        <div 
+          className="fixed inset-0 bg-slate-900/65 z-[9999] flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in text-start"
+          onClick={() => setValidationAlertFields(null)}
+          dir={lang === "ar" ? "rtl" : "ltr"}
+        >
+          <div 
+            className="bg-white rounded-2xl border border-slate-200/95 shadow-2xl max-w-md w-full overflow-hidden transform scale-100 transition-all duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 flex items-center gap-3 bg-rose-50 border-b border-rose-100 text-rose-700">
+              <div className="p-2.5 bg-rose-100/85 rounded-lg shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div className="grow">
+                <h4 className="font-extrabold text-sm text-rose-900 leading-tight">
+                  {lang === "ar" ? "🔑 تنبيه: توجد خانات غير مكتملة" : lang === "fr" ? "🔑 Erreur : Champs incomplets" : "🔑 Alert: Missing Information"}
+                </h4>
+                <p className="text-[10px] text-rose-500 font-bold mt-0.5 leading-tight">
+                  {lang === "ar" ? "الرجاء تعبئة كافة البيانات المطلوبة للمتابعة" : lang === "fr" ? "Veuillez remplir les champs obligatoires" : "Please complete all mandatory parameters"}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[300px] overflow-y-auto">
+              <p className="text-xs text-slate-650 font-semibold leading-relaxed">
+                {lang === "ar" 
+                  ? "لا يمكنك الانتقال إلى المرحلة التالية حتى تقوم بملء أو تصحيح هذه الخانات الإلزامية:"
+                  : lang === "fr"
+                  ? "Vous ne pouvez pas passer à l'étape suivante tant que ces informations requises ne sont pas fournies :"
+                  : "You cannot proceed to the next stage until you provide or correct these mandatory inputs:"}
+              </p>
+
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-150 divide-y divide-slate-150 font-semibold text-xs text-slate-755">
+                {validationAlertFields.map((fieldKey, idx) => {
+                  const label = getFieldLabel(fieldKey);
+                  const errorMsg = errors[fieldKey];
+                  return (
+                    <div key={idx} className="py-2.5 flex flex-col justify-start gap-1 first:pt-0 last:pb-0">
+                      <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                        <span className="font-extrabold text-slate-800">{label}</span>
+                      </div>
+                      {errorMsg && (
+                        <span className="text-[10px] text-rose-600 font-bold leading-normal text-start pr-3.5 pl-3.5 mt-0.5">
+                          {errorMsg}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-4 border-t border-slate-150 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setValidationAlertFields(null)}
+                className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-black cursor-pointer shadow-sm hover:shadow-md transition-all duration-150 w-full sm:w-auto"
+              >
+                {lang === "ar" ? "حسنًا، سأكملها الآن" : lang === "fr" ? "D'accord, je complète" : "Okay, Let's Complete"}
               </button>
             </div>
           </div>
